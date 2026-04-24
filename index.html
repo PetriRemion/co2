@@ -3,8 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
   <style>
     body {
       margin: 0;
@@ -12,97 +10,88 @@
       background: #fff;
       color: #333;
     }
-
     .card {
       padding: 16px;
       box-sizing: border-box;
       width: 100%;
       height: 100vh;
     }
-
-    .title {
+    h3 {
+      margin: 0 0 6px;
       font-size: 20px;
-      font-weight: 600;
-      margin-bottom: 4px;
+      font-weight: 500;
     }
-
-    .subtitle {
+    .sub {
       font-size: 13px;
       color: #777;
       margin-bottom: 12px;
     }
-
-    .summary {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 12px;
-      flex-wrap: wrap;
-    }
-
-    .box {
+    .top {
       background: #f5f5f5;
       border-left: 5px solid #e60000;
-      padding: 10px 12px;
-      min-width: 150px;
+      padding: 10px;
+      margin-bottom: 14px;
     }
-
-    .box strong {
-      display: block;
-      font-size: 18px;
-      text-transform: capitalize;
+    svg {
+      width: 100%;
+      height: 260px;
+      border: 1px solid #eee;
+      background: #fff;
     }
-
-    .box span {
-      font-size: 12px;
-      color: #666;
+    .axis {
+      stroke: #aaa;
+      stroke-width: 1;
     }
-
-    canvas {
-      width: 100% !important;
-      max-height: 260px;
+    .grid {
+      stroke: #ddd;
+      stroke-width: 1;
+      stroke-dasharray: 4 4;
+    }
+    .line {
+      fill: none;
+      stroke: #00aeea;
+      stroke-width: 3;
+    }
+    .point {
+      fill: #00aeea;
+    }
+    .limit {
+      stroke: #e60000;
+      stroke-width: 2;
+      stroke-dasharray: 6 4;
     }
   </style>
 </head>
 
 <body>
   <div class="card">
-    <div class="title">CO2 – viikon neuvotteluhuiput</div>
-    <div class="subtitle">Sensoridatan perusteella laskettu käyttöaste</div>
+    <h3>CO2 – viikon neuvotteluhuiput</h3>
+    <div class="sub">Sensoridatan perusteella laskettu käyttöaste</div>
 
-    <div class="summary">
-      <div class="box">
-        <strong id="topDay">Ladataan...</strong>
-        <span>Aktiivisin päivä</span>
-      </div>
-
-      <div class="box">
-        <strong id="topValue">–</strong>
-        <span>Korkein CO2</span>
-      </div>
+    <div class="top">
+      <strong id="topDay">Ladataan...</strong><br>
+      <span id="topInfo">Analysoidaan CO2-dataa</span>
     </div>
 
-    <canvas id="co2Chart"></canvas>
+    <svg id="chart" viewBox="0 0 700 260" preserveAspectRatio="none"></svg>
   </div>
 
   <script>
     const CO2_LIMIT = 750;
 
-    // TESTIDATA. Korvaa tämä myöhemmin API-haulla.
-    async function loadCo2Data() {
-      return [
-        { timestamp: "2026-04-20T09:00:00", value: 420 },
-        { timestamp: "2026-04-20T10:00:00", value: 780 },
-        { timestamp: "2026-04-20T11:00:00", value: 920 },
-        { timestamp: "2026-04-21T09:00:00", value: 510 },
-        { timestamp: "2026-04-21T10:00:00", value: 690 },
-        { timestamp: "2026-04-22T09:00:00", value: 870 },
-        { timestamp: "2026-04-22T10:00:00", value: 980 },
-        { timestamp: "2026-04-22T11:00:00", value: 1020 },
-        { timestamp: "2026-04-23T09:00:00", value: 610 },
-        { timestamp: "2026-04-24T09:00:00", value: 760 },
-        { timestamp: "2026-04-24T10:00:00", value: 810 }
-      ];
-    }
+    const data = [
+      { timestamp: "2026-04-20T09:00:00", value: 420 },
+      { timestamp: "2026-04-20T10:00:00", value: 780 },
+      { timestamp: "2026-04-20T11:00:00", value: 920 },
+      { timestamp: "2026-04-21T09:00:00", value: 510 },
+      { timestamp: "2026-04-21T10:00:00", value: 690 },
+      { timestamp: "2026-04-22T09:00:00", value: 870 },
+      { timestamp: "2026-04-22T10:00:00", value: 980 },
+      { timestamp: "2026-04-22T11:00:00", value: 1020 },
+      { timestamp: "2026-04-23T09:00:00", value: 610 },
+      { timestamp: "2026-04-24T09:00:00", value: 760 },
+      { timestamp: "2026-04-24T10:00:00", value: 810 }
+    ];
 
     function dayName(timestamp) {
       return new Date(timestamp).toLocaleDateString("fi-FI", {
@@ -115,78 +104,67 @@
 
       data.forEach(row => {
         const day = dayName(row.timestamp);
+        if (!days[day]) days[day] = { day, high: 0, max: 0 };
 
-        if (!days[day]) {
-          days[day] = {
-            day,
-            highCount: 0,
-            max: 0
-          };
-        }
-
-        if (row.value >= CO2_LIMIT) {
-          days[day].highCount++;
-        }
-
+        if (row.value >= CO2_LIMIT) days[day].high++;
         days[day].max = Math.max(days[day].max, row.value);
       });
 
-      return Object.values(days).sort((a, b) => {
-        return b.highCount - a.highCount || b.max - a.max;
-      });
+      return Object.values(days).sort((a, b) =>
+        b.high - a.high || b.max - a.max
+      )[0];
     }
 
-    async function render() {
-      const data = await loadCo2Data();
-      const insight = analyze(data);
-      const top = insight[0];
+    function drawChart(data) {
+      const svg = document.getElementById("chart");
+      const w = 700;
+      const h = 260;
+      const pad = 36;
 
-      document.getElementById("topDay").textContent = top ? top.day : "Ei dataa";
-      document.getElementById("topValue").textContent = top ? top.max + " ppm" : "–";
+      const min = 350;
+      const max = 1100;
 
-      const labels = data.map(row =>
-        new Date(row.timestamp).toLocaleString("fi-FI", {
-          weekday: "short",
-          hour: "2-digit",
-          minute: "2-digit"
-        })
-      );
+      function x(i) {
+        return pad + (i / (data.length - 1)) * (w - pad * 2);
+      }
 
-      const values = data.map(row => row.value);
+      function y(value) {
+        return h - pad - ((value - min) / (max - min)) * (h - pad * 2);
+      }
 
-      new Chart(document.getElementById("co2Chart"), {
-        type: "line",
-        data: {
-          labels,
-          datasets: [
-            {
-              label: "CO2 ppm",
-              data: values,
-              tension: 0.3
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              display: true
-            }
-          },
-          scales: {
-            y: {
-              title: {
-                display: true,
-                text: "CO2 ppm"
-              }
-            }
-          }
-        }
-      });
+      const points = data.map((d, i) => `${x(i)},${y(d.value)}`).join(" ");
+
+      svg.innerHTML = `
+        <line class="axis" x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}" />
+        <line class="axis" x1="${pad}" y1="${pad}" x2="${pad}" y2="${h-pad}" />
+
+        <line class="grid" x1="${pad}" y1="${y(500)}" x2="${w-pad}" y2="${y(500)}" />
+        <line class="grid" x1="${pad}" y1="${y(750)}" x2="${w-pad}" y2="${y(750)}" />
+        <line class="grid" x1="${pad}" y1="${y(1000)}" x2="${w-pad}" y2="${y(1000)}" />
+
+        <line class="limit" x1="${pad}" y1="${y(CO2_LIMIT)}" x2="${w-pad}" y2="${y(CO2_LIMIT)}" />
+
+        <text x="6" y="${y(500)+4}" font-size="11">500</text>
+        <text x="6" y="${y(750)+4}" font-size="11">750</text>
+        <text x="6" y="${y(1000)+4}" font-size="11">1000</text>
+
+        <polyline class="line" points="${points}" />
+
+        ${data.map((d, i) => `
+          <circle class="point" cx="${x(i)}" cy="${y(d.value)}" r="4" />
+        `).join("")}
+      `;
     }
 
-    render();
+    const top = analyze(data);
+
+    document.getElementById("topDay").textContent =
+      top ? top.day.charAt(0).toUpperCase() + top.day.slice(1) : "Ei dataa";
+
+    document.getElementById("topInfo").textContent =
+      top ? `${top.high} CO2-nostoa, korkein ${top.max} ppm` : "";
+
+    drawChart(data);
   </script>
 </body>
 </html>
